@@ -9,6 +9,12 @@ to run:
 
 ```bash
 pip install "fastapi[standard]"
+pip install -r requirements.txt
+
+cd frontend 
+npm install
+
+cd ..
+
 fastapi dev
 ```
-
