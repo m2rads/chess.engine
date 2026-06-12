@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Chess } from "chess.js";
 import { Chessboard, COLOR, INPUT_EVENT_TYPE } from "cm-chessboard";
 import {
@@ -27,14 +27,16 @@ async function fetchEngineMove(fen) {
     body: JSON.stringify({ fen }),
   });
   const data = await res.json();
-  return data.move; // expects UCI string e.g. "e7e5"
+  return data.move;
 }
 
 export default function App() {
   const boardRef = useRef(null);
   const chessboardRef = useRef(null);
 
-  useEffect(() => {
+  const initBoard = useCallback(() => {
+    if (chessboardRef.current) chessboardRef.current.destroy();
+
     const board = new Chessboard(boardRef.current, {
       position: chess.fen(),
       orientation: COLOR.white,
@@ -80,12 +82,46 @@ export default function App() {
     }, COLOR.white);
 
     chessboardRef.current = board;
-    return () => board.destroy();
   }, []);
 
+  useEffect(() => {
+    initBoard();
+    return () => chessboardRef.current?.destroy();
+  }, [initBoard]);
+
+  function handleNewGame() {
+    chess.reset();
+    initBoard();
+  }
+
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "2rem" }}>
-      <div ref={boardRef} style={{ width: "480px", height: "480px" }} />
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.5rem",
+        background: "#1a1a1a",
+      }}
+    >
+      <div ref={boardRef} style={{ width: "600px", height: "600px" }} />
+      <button
+        onClick={handleNewGame}
+        style={{
+          padding: "0.6rem 2rem",
+          fontSize: "1rem",
+          fontWeight: "600",
+          background: "#fff",
+          color: "#1a1a1a",
+          border: "none",
+          borderRadius: "6px",
+          cursor: "pointer",
+        }}
+      >
+        New Game
+      </button>
     </div>
   );
 }
