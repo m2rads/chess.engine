@@ -22,8 +22,12 @@ function KingIcon({ piece, selected, onClick }) {
         background: isRandom
           ? "linear-gradient(to bottom right, #c8c8c8 50%, #1a1a1a 50%)"
           : selected
-          ? isWhite ? "#e8e8e8" : "#2a2a2a"
-          : isWhite ? "#c8c8c8" : "#1a1a1a",
+            ? isWhite
+              ? "#e8e8e8"
+              : "#2a2a2a"
+            : isWhite
+              ? "#c8c8c8"
+              : "#1a1a1a",
         border: selected ? "3px solid #7fa650" : "3px solid #444",
         borderRadius: "10px",
         cursor: "pointer",
@@ -35,9 +39,23 @@ function KingIcon({ piece, selected, onClick }) {
       }}
     >
       {isRandom ? (
-        <span style={{ fontSize: "2.5rem", color: "#777", lineHeight: 1, textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>?</span>
+        <span
+          style={{
+            fontSize: "2.5rem",
+            color: "#777",
+            lineHeight: 1,
+            textShadow: "0 1px 3px rgba(0,0,0,0.4)",
+          }}
+        >
+          ?
+        </span>
       ) : (
-        <svg viewBox="0 0 45 45" width="72" height="72" style={{ display: "block" }}>
+        <svg
+          viewBox="0 0 45 45"
+          width="72"
+          height="72"
+          style={{ display: "block" }}
+        >
           <use href={`${SPRITE}#${piece}`} />
         </svg>
       )}
@@ -58,22 +76,43 @@ function ColorPicker({ onSelect }) {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "2rem",
-      background: "#1a1a1a",
-    }}>
-      <p style={{ color: "#aaa", fontSize: "1rem", margin: 0, letterSpacing: "0.05em" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "2rem",
+        background: "#1a1a1a",
+      }}
+    >
+      <p
+        style={{
+          color: "#aaa",
+          fontSize: "1rem",
+          margin: 0,
+          letterSpacing: "0.05em",
+        }}
+      >
         PLAY AS
       </p>
       <div style={{ display: "flex", gap: "1.5rem" }}>
-        <KingIcon piece="wk"     selected={selected === "white"}  onClick={() => setSelected("white")} />
-        <KingIcon piece="random" selected={selected === "random"} onClick={() => setSelected("random")} />
-        <KingIcon piece="bk"     selected={selected === "black"}  onClick={() => setSelected("black")} />
+        <KingIcon
+          piece="wk"
+          selected={selected === "white"}
+          onClick={() => setSelected("white")}
+        />
+        <KingIcon
+          piece="random"
+          selected={selected === "random"}
+          onClick={() => setSelected("random")}
+        />
+        <KingIcon
+          piece="bk"
+          selected={selected === "black"}
+          onClick={() => setSelected("black")}
+        />
       </div>
       <button
         onClick={handlePlay}
@@ -117,11 +156,50 @@ async function fetchEngineMove(fen) {
   return data.move;
 }
 
+function NavButton({ children, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "0.6rem 1.2rem",
+        fontSize: "1.1rem",
+        fontWeight: "600",
+        background: disabled ? "#333" : "#fff",
+        color: disabled ? "#666" : "#1a1a1a",
+        border: "none",
+        borderRadius: "6px",
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Board({ playerColor, onNewGame }) {
   const boardRef = useRef(null);
   const chessboardRef = useRef(null);
+  // history of FEN positions; viewIndex points at the position shown on the board
+  const historyRef = useRef([]);
+  const viewIndexRef = useRef(0);
+  const [nav, setNav] = useState({ index: 0, length: 1 });
   const orientation = playerColor === "white" ? COLOR.white : COLOR.black;
   const playerColorCode = playerColor === "white" ? COLOR.white : COLOR.black;
+
+  const pushPosition = useCallback(() => {
+    historyRef.current.push(chess.fen());
+    viewIndexRef.current = historyRef.current.length - 1;
+    setNav({ index: viewIndexRef.current, length: historyRef.current.length });
+  }, []);
+
+  const goTo = useCallback((index) => {
+    if (index < 0 || index >= historyRef.current.length) return;
+    viewIndexRef.current = index;
+    setNav({ index, length: historyRef.current.length });
+    chessboardRef.current?.removeMarkers();
+    chessboardRef.current?.setPosition(historyRef.current[index], true);
+  }, []);
 
   const initBoard = useCallback(() => {
     if (chessboardRef.current) chessboardRef.current.destroy();
@@ -133,19 +211,31 @@ function Board({ playerColor, onNewGame }) {
       extensions: [{ class: Markers }],
     });
 
+    const isViewingLatest = () =>
+      viewIndexRef.current === historyRef.current.length - 1;
+
     board.enableMoveInput((event) => {
       if (event.type === INPUT_EVENT_TYPE.moveInputStarted) {
-        return chess.moves({ square: event.squareFrom, verbose: true }).length > 0;
+        if (!isViewingLatest()) return false;
+        return (
+          chess.moves({ square: event.squareFrom, verbose: true }).length > 0
+        );
       }
 
       if (event.type === INPUT_EVENT_TYPE.validateMoveInput) {
+        if (!isViewingLatest()) return false;
         try {
-          chess.move({ from: event.squareFrom, to: event.squareTo, promotion: "q" });
+          chess.move({
+            from: event.squareFrom,
+            to: event.squareTo,
+            promotion: "q",
+          });
         } catch {
           return false;
         }
 
         board.setPosition(chess.fen(), true);
+        pushPosition();
         highlightCheckmatedKing(board);
 
         if (!chess.isGameOver()) {
@@ -156,6 +246,7 @@ function Board({ playerColor, onNewGame }) {
               promotion: botMove[4] || "q",
             });
             board.setPosition(chess.fen(), true);
+            pushPosition();
             highlightCheckmatedKing(board);
           });
         }
@@ -165,10 +256,13 @@ function Board({ playerColor, onNewGame }) {
     }, playerColorCode);
 
     chessboardRef.current = board;
-  }, [orientation, playerColorCode]);
+  }, [orientation, playerColorCode, pushPosition]);
 
   useEffect(() => {
     chess.reset();
+    historyRef.current = [chess.fen()];
+    viewIndexRef.current = 0;
+    setNav({ index: 0, length: 1 });
     initBoard();
 
     // if playing as black, engine goes first
@@ -180,38 +274,59 @@ function Board({ playerColor, onNewGame }) {
           promotion: botMove[4] || "q",
         });
         chessboardRef.current?.setPosition(chess.fen(), true);
+        pushPosition();
       });
     }
 
     return () => chessboardRef.current?.destroy();
-  }, [initBoard, playerColor]);
+  }, [initBoard, playerColor, pushPosition]);
+
+  const atStart = nav.index === 0;
+  const atLatest = nav.index === nav.length - 1;
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "1.5rem",
-      background: "#1a1a1a",
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1.5rem",
+        background: "#1a1a1a",
+      }}
+    >
       <div ref={boardRef} style={{ width: "600px", height: "600px" }} />
-      <button
-        onClick={onNewGame}
-        style={{
-          padding: "0.6rem 2rem",
-          fontSize: "1rem",
-          fontWeight: "600",
-          background: "#fff",
-          color: "#1a1a1a",
-          border: "none",
-          borderRadius: "6px",
-          cursor: "pointer",
-        }}
-      >
-        New Game
-      </button>
+      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        <NavButton onClick={() => goTo(0)} disabled={atStart}>
+          ⏮
+        </NavButton>
+        <NavButton onClick={() => goTo(nav.index - 1)} disabled={atStart}>
+          ◀
+        </NavButton>
+        <NavButton onClick={() => goTo(nav.index + 1)} disabled={atLatest}>
+          ▶
+        </NavButton>
+        <NavButton onClick={() => goTo(nav.length - 1)} disabled={atLatest}>
+          ⏭
+        </NavButton>
+        <button
+          onClick={onNewGame}
+          style={{
+            marginLeft: "1rem",
+            padding: "0.6rem 2rem",
+            fontSize: "1rem",
+            fontWeight: "600",
+            background: "#fff",
+            color: "#1a1a1a",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+          }}
+        >
+          New Game
+        </button>
+      </div>
     </div>
   );
 }
@@ -224,9 +339,6 @@ export default function App() {
   }
 
   return (
-    <Board
-      playerColor={playerColor}
-      onNewGame={() => setPlayerColor(null)}
-    />
+    <Board playerColor={playerColor} onNewGame={() => setPlayerColor(null)} />
   );
 }
