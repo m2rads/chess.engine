@@ -12,9 +12,8 @@ b1 = checkpoint["b1"]
 W2 = checkpoint["W2"]
 b2 = checkpoint["b2"]
 
-
+# create a map of all possible moves on the board
 all_moves = []
-
 for from_sqr in chess.SQUARES:
     for to_sqr in chess.SQUARES:
         if from_sqr != to_sqr:
@@ -25,11 +24,9 @@ for from_sqr in chess.SQUARES:
                 all_moves.append(promo_move)
 
 all_moves = sorted(set(str(m) for m in all_moves))
-mtoi = {m: i for i, m in enumerate(all_moves)}
-itom = {i: m for i, m in enumerate(all_moves)}
-
+mtoi = {m: i for i, m in enumerate(all_moves)}  # move to index
+itom = {i: m for i, m in enumerate(all_moves)}  # index to move
 all_moves_size = len(all_moves)
-
 
 app = FastAPI()
 
