@@ -1,9 +1,24 @@
 import { useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard, COLOR, INPUT_EVENT_TYPE } from "cm-chessboard";
+import {
+  Markers,
+  MARKER_TYPE,
+} from "cm-chessboard/src/extensions/markers/Markers.js";
 import "cm-chessboard/assets/chessboard.css";
+import "cm-chessboard/assets/extensions/markers/markers.css";
 
 const chess = new Chess();
+
+function highlightCheckmatedKing(board) {
+  if (!chess.isCheckmate()) return;
+  const kingColor = chess.turn() === "w" ? "w" : "b";
+  const kingSquare = chess
+    .board()
+    .flat()
+    .find((p) => p && p.type === "k" && p.color === kingColor).square;
+  board.addMarker(MARKER_TYPE.frameDanger, kingSquare);
+}
 
 async function fetchEngineMove(fen) {
   const res = await fetch("/move", {
@@ -24,6 +39,7 @@ export default function App() {
       position: chess.fen(),
       orientation: COLOR.white,
       assetsUrl: "/node_modules/cm-chessboard/assets/",
+      extensions: [{ class: Markers }],
     });
 
     board.enableMoveInput((event) => {
@@ -45,6 +61,7 @@ export default function App() {
         }
 
         board.setPosition(chess.fen(), true);
+        highlightCheckmatedKing(board);
 
         if (!chess.isGameOver()) {
           fetchEngineMove(chess.fen()).then((botMove) => {
@@ -54,6 +71,7 @@ export default function App() {
               promotion: botMove[4] || "q",
             });
             board.setPosition(chess.fen(), true);
+            highlightCheckmatedKing(board);
           });
         }
 
