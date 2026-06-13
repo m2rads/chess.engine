@@ -6,7 +6,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # load the model
-checkpoint = torch.load("model_params.pt", map_location="cpu")
+from huggingface_hub import hf_hub_download
+path = hf_hub_download(repo_id="m2rads/tinychess", filename="model_params.pt")
+checkpoint = torch.load(path, map_location="cpu")
 W1 = checkpoint["W1"]
 b1 = checkpoint["b1"]
 W2 = checkpoint["W2"]
